@@ -15,6 +15,7 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
+import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.util.TreePath;
@@ -68,7 +69,6 @@ public class RSGProcessor extends AbstractProcessor {
                     } else if (parent instanceof JCTree.JCExpressionStatement) {
                         if (path.getLeaf() instanceof JCTree.JCMethodInvocation jCMethodInvocation) {
                             for (JCTree.JCExpression arg : jCMethodInvocation.getArguments()) {
-                                System.out.println("!!!" + arg);
                                 scan(arg, path.getCompilationUnit());
                             }
                         }
@@ -85,6 +85,42 @@ public class RSGProcessor extends AbstractProcessor {
                 }
 
                 return (MethodInvocationTree)super.visitMethodInvocation(node, unitTree);
+            }
+
+            @Override
+            public BinaryTree visitBinary(BinaryTree node, CompilationUnitTree unitTree) {
+                TreePath path = getCurrentPath();
+                JCTree.JCExpression newMethodInvocation = bigDecimalExpression.convert(path.getLeaf().toString());
+                JCTree parent = (JCTree) path.getParentPath().getLeaf();
+
+/*
+                if (parent instanceof JCTree.JCExpressionStatement jCExpressionStatement) {
+                    jCExpressionStatement.expr = newMethodInvocation;
+                } else if (parent instanceof JCTree.JCVariableDecl jCVariableDecl) {
+                    jCVariableDecl.init = newMethodInvocation;
+                } else */if (parent instanceof JCTree.JCMethodInvocation jCMethodInvocation) {
+                    if (keyword.equals(jCMethodInvocation.getMethodSelect().toString())) {
+                        List<JCTree.JCExpression> newArgs = List.nil();
+                        
+                        for (JCTree.JCExpression arg : jCMethodInvocation.args) {
+                            if (arg == path.getLeaf()) {
+                                newArgs = newArgs.append(newMethodInvocation);
+                            } else {
+                                newArgs = newArgs.append(arg);
+                            }
+
+                            jCMethodInvocation.args = newArgs;
+                        }
+                    }
+                } /*else if (parent instanceof JCTree.JCReturn jCReturn) {
+                    jCReturn.expr = newMethodInvocation;
+                } else if (parent instanceof JCTree.JCParens parensNode) {
+                    parensNode.expr = newMethodInvocation;
+                } else {
+                    if (parent != null)
+                        System.out.println("Not found!!! --> " + parent.getKind().toString());
+                }*/
+                return (BinaryTree)super.visitBinary(node, unitTree);
             }
         };       
     }
