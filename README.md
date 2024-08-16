@@ -11,11 +11,15 @@ mvn package
 import java.math.BigDecimal;
 import com.ryusatgat.processor.RSGBigDecimal;
 
-public class Main {
-  @RSGBigDecimal
+public class Rs {
+  @RSGBigDecimal  // @RSGBigDecimal("OP2") you can change keyword
   public static void main(String[] args) {
-    BigDecimal a = 1 + 2;
-    System.out.println(a + 1.1);
+    BigDecimal a = OP(1 + 2);
+    BigDecimal b = OP(3);
+    BigDecimal c = OP(a + b);
+    
+
+    System.out.println(OP(a + 1.1));
   }
 }
 ```
@@ -29,15 +33,17 @@ javac -processor com.ryusatgat.processor.RSGProcessor \
       -cp rsg-processor-x.x.jar Main.java
 ```
 
-## Converted code by RSGProcessor
+## Generated class by RSGProcessor (disassembled)
 ```java
 import java.math.BigDecimal;
 
-public class Main {
+public class Rs {
   public static void main(String[] paramArrayOfString) {
-    BigDecimal bigDecimal = (
+    BigDecimal bigDecimal1 = (
       new BigDecimal("1")).add(new BigDecimal("2"));
-    System.out.println(bigDecimal.add(new BigDecimal("1.1")));
+    BigDecimal bigDecimal2 = new BigDecimal("3");
+    BigDecimal bigDecimal3 = bigDecimal1.add(bigDecimal2);
+    System.out.println(bigDecimal1.add(new BigDecimal("1.1")));
   }
 }
 ```
