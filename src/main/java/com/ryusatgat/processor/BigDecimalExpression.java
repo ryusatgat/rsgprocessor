@@ -105,9 +105,6 @@ public class BigDecimalExpression {
         for (String token : tokens) {
             if (token.isEmpty()) continue;
             if (isOperator(token.charAt(0))) {
-                if (stack.size() < 2) {
-                    throw new IllegalStateException("Invalid postfix expression: not enough operands for operator " + token);
-                }
                 JCTree.JCExpression right = stack.pop();
                 JCTree.JCExpression left = stack.pop();
                 JCTree.JCExpression result = applyBigDecimalOperator(left, token, right);
@@ -115,10 +112,6 @@ public class BigDecimalExpression {
             } else {
                 stack.push(createBigDecimalLiteralOrVariable(token));
             }
-        }
-
-        if (stack.size() != 1) {
-            throw new IllegalStateException("Invalid postfix expression: too many operands");
         }
     
         return stack.pop();

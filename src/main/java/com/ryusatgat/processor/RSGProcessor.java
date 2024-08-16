@@ -15,8 +15,8 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
-import com.sun.source.tree.BinaryTree;
 import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
@@ -33,6 +33,7 @@ public class RSGProcessor extends AbstractProcessor {
     private Context context;
     private TreePathScanner<Object, CompilationUnitTree> scanner;
     private BigDecimalExpression bigDecimalExpression;
+    private String keyword;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -47,44 +48,45 @@ public class RSGProcessor extends AbstractProcessor {
 
         this.scanner = new TreePathScanner<>() {
             @Override
-            public BinaryTree visitBinary(BinaryTree node, CompilationUnitTree unitTree) {
-                TreePath currentPath = getCurrentPath();
-                replaceBinaryOperation(currentPath);
-
-                return (BinaryTree)super.visitBinary(node, unitTree);
-            }
-
-            private void replaceBinaryOperation(TreePath path) {
-                JCTree.JCExpression newMethodInvocation = bigDecimalExpression.convert(path.getLeaf().toString());
+            public MethodInvocationTree visitMethodInvocation(MethodInvocationTree node, CompilationUnitTree unitTree) {
+                TreePath path = getCurrentPath();
                 JCTree parent = (JCTree) path.getParentPath().getLeaf();
-
-                if (parent instanceof JCTree.JCExpressionStatement jCExpressionStatement) {
-                    jCExpressionStatement.expr = newMethodInvocation;
-                } else if (parent instanceof JCTree.JCVariableDecl jCVariableDecl) {
-                    jCVariableDecl.init = newMethodInvocation;
-                } else if (parent instanceof JCTree.JCMethodInvocation jCMethodInvocation) {
-                    List<JCTree.JCExpression> newArgs = List.nil();
-                    
-                    for (JCTree.JCExpression arg : jCMethodInvocation.args) {
-                        if (arg == path.getLeaf()) {
-                            newArgs = newArgs.append(newMethodInvocation);
-                        } else {
-                            newArgs = newArgs.append(arg);
+                JCTree.JCExpression newMethodInvocation = bigDecimalExpression.convert(path.getLeaf().toString());
+                
+                if (keyword.equals(node.getMethodSelect().toString())) {
+                    if (parent instanceof JCTree.JCMethodInvocation jCMethodInvocation) {
+                        List<JCTree.JCExpression> newArgs = List.nil();                        
+                        
+                        for (JCTree.JCExpression arg: jCMethodInvocation.args) {
+                            if (arg == path.getLeaf()) {
+                                newArgs = newArgs.append(newMethodInvocation);
+                            } else {
+                                newArgs = newArgs.append(arg);
+                            }
                         }
-
                         jCMethodInvocation.args = newArgs;
+                    } else if (parent instanceof JCTree.JCExpressionStatement) {
+                        if (path.getLeaf() instanceof JCTree.JCMethodInvocation jCMethodInvocation) {
+                            for (JCTree.JCExpression arg : jCMethodInvocation.getArguments()) {
+                                System.out.println("!!!" + arg);
+                                scan(arg, path.getCompilationUnit());
+                            }
+                        }
+                    } else if (parent instanceof JCTree.JCAssign jCAssign) {
+                        jCAssign.rhs = newMethodInvocation;
                     }
-                } else if (parent instanceof JCTree.JCReturn jCReturn) {
-                    jCReturn.expr = newMethodInvocation;
-                } else if (parent instanceof JCTree.JCParens parensNode) {
-                    parensNode.expr = newMethodInvocation;
-                } else {
-                    if (parent != null)
-                        System.out.println("Not found!!! --> " + parent.getKind().toString());
+                    else if (parent instanceof JCTree.JCVariableDecl jCVariableDecl) {
+                        jCVariableDecl.init = newMethodInvocation;
+                    } else if (parent instanceof JCTree.JCParens parensNode) {
+                        parensNode.expr = newMethodInvocation;
+                    } else {
+                        System.out.println("ERROR " + parent.getClass());
+                    }
                 }
-            }                    
-        };
 
+                return (MethodInvocationTree)super.visitMethodInvocation(node, unitTree);
+            }
+        };       
     }
 
     @Override
@@ -94,7 +96,9 @@ public class RSGProcessor extends AbstractProcessor {
                 msg.printMessage(Diagnostic.Kind.ERROR, "Bad annotation position: " + element.getKind().toString());
             } else {
                 if (Objects.nonNull(scanner)) {
-                    final TreePath path = trees.getPath(element);
+                    RSGBigDecimal annotation = element.getAnnotation(RSGBigDecimal.class);
+                    this.keyword = annotation.value();
+                    final TreePath path = trees.getPath(element);                    
                     // msg.printMessage(Diagnostic.Kind.NOTE, "processing >> " + element.getSimpleName().toString());
                     scanner.scan(path, path.getCompilationUnit());
                 }
@@ -104,37 +108,4 @@ public class RSGProcessor extends AbstractProcessor {
 
         return true;
     }
-
-/*
-    public String findMethodName(TreePath path) {
-        while (path != null) {
-            if (path.getLeaf() instanceof JCMethodDecl methodDecl) {
-                return methodDecl.name.toString();
-            }
-            path = path.getParentPath();
-        }
-
-        return null;
-    }
-    
-    private void buildVariableTypes(TreePath path) {
-        path.getCompilationUnit().getTypeDecls().forEach(typeDecl -> {
-            if (typeDecl instanceof JCClassDecl classDecl) {
-               for (JCTree member : classDecl.defs) {
-                    if (member instanceof JCMethodDecl methodDecl) {
-                        JCTree.JCBlock body = methodDecl.getBody();
-                        if (body != null) {
-                            body.stats.forEach(stmt -> {
-                                if (stmt instanceof JCVariableDecl varDecl) {
-                                    System.out.println("Variable: " + varDecl.getName() + " " + varDecl.getType());
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-        });
-    }
-*/
-
 }
